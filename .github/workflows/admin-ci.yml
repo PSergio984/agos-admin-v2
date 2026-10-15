@@ -1,0 +1,53 @@
+name: Admin CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+    branches:
+      - main
+      - 'feat/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-build:
+    name: Typecheck, lint, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        # tsc -b, not bare tsc --noEmit — tsconfig.json is a solution file
+        # (files: [] + project references); both referenced configs set noEmit.
+        run: npx tsc -b
+
+      - name: ESLint
+        # 91 pre-existing errors across the codebase (plus noise from the
+        # tracked, generated dev-dist/workbox-*.js) — informational until a
+        # cleanup pass lands; flip to a hard gate when it does.
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Build
+        run: npx vite build

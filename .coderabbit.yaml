@@ -1,0 +1,34 @@
+language: en
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches: [ "main" ]
+  path_instructions:
+    - path: "src/pages/**"
+      instructions: |
+        Feature pages: rendering and wiring only. Flag business logic living
+        in components that belongs in a context or hook — API calls, data
+        transforms, and derived state go in src/context/**, src/hooks/**, or
+        src/lib/api/**.
+    - path: "src/context/**"
+      instructions: |
+        Global state lives here (Context API — no Redux/Zustand). Flag fetch
+        calls without error handling: an unhandled rejection leaves stale
+        state and a console-only failure the admin never sees — surface
+        errors via ToastContext or an explicit error state.
+    - path: "src/lib/api/**"
+      instructions: |
+        API layer: one module per domain. Flag axios/fetch calls that bypass
+        apiClient (axiosConfig.ts) — they skip the JWT attach + auto-refresh
+        interceptors. Legitimate exceptions: SSE/streaming fetch
+        (analysis.ts), the token-refresh call itself, and third-party APIs
+        (e.g. CARTO basemap) — those must still expire the session on 401
+        via expireAuthSession() where applicable.
+    - path: "src/guards/**"
+      instructions: |
+        Route guards only: auth checks and redirects (see ProtectedRoute).
+        Flag API calls and business logic here — they belong in
+        contexts/hooks.
