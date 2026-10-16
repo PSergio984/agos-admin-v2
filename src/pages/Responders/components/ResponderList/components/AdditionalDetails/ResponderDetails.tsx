@@ -5,6 +5,7 @@ import { responderAPI } from "../../../../../../lib/api/responder";
 import { Pencil, X } from "lucide-react";
 
 import ResponderAdditionalDetails from "./ResponderAdditionalDetails";
+import ResponderSitesSection from "./ResponderSitesSection";
 import EditResponderForm from "./EditResponderForm";
 
 import PendingDetails from "./PendingDetails";
@@ -142,6 +143,10 @@ const MainDetails = ({ responder }: { responder: ResponderAllDetails }) => {
                 <>
                     {isPending && <PendingResponderDetails responder={responder} />}
                     {!isPending && <ActiveResponderDetails responder={responder} />}
+                    <ResponderSitesSection
+                        key={responder.id}
+                        responder={responder}
+                    />
                 </>
             )}
         </>
@@ -201,7 +206,7 @@ export default function ResponderDetails() {
         <div
             className={`h-full rounded-2xl border border-gray-200 dark:border-white/10 bg-white/60 dark:bg-white/[0.03] backdrop-blur-xl transition-all duration-300 ease-in-out shadow-2xl overflow-hidden ${sideDrawerOpen ? "w-[22rem]" : "w-0 border-transparent dark:border-transparent opacity-0"}`}
         >
-            <div className="flex h-full flex-col gap-3 p-4">
+            <div className="flex h-full flex-col gap-3 p-4 overflow-y-auto">
                 {isFetching && <ResponderDetailsSkeleton />}
 
                 {!isFetching && responder === null && (

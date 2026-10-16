@@ -1,5 +1,9 @@
 import type {
+    ResponderActiveSiteResponse,
     ResponderCreateRequest,
+    ResponderDeploymentCreateRequest,
+    ResponderDeploymentItem,
+    ResponderDeploymentsResponse,
     ResponderUpdateRequest,
     ResponderAdditionalDetails,
     ResponderListItem,
@@ -51,6 +55,47 @@ export const responderAPI = {
             payload,
         );
         return res.data as ResponderListItem;
+    },
+
+    getDeployments: async (
+        responderId: string,
+    ): Promise<ResponderDeploymentsResponse> => {
+        const res = await apiClient.get(
+            `/responders/${responderId}/deployments`,
+        );
+        return res.data as ResponderDeploymentsResponse;
+    },
+
+    openDeployment: async (
+        responderId: string,
+        payload: ResponderDeploymentCreateRequest,
+    ): Promise<ResponderDeploymentItem> => {
+        const res = await apiClient.post(
+            `/responders/${responderId}/deployments`,
+            payload,
+        );
+        return res.data as ResponderDeploymentItem;
+    },
+
+    closeDeployment: async (
+        responderId: string,
+        deploymentId: number,
+    ): Promise<ResponderDeploymentItem> => {
+        const res = await apiClient.post(
+            `/responders/${responderId}/deployments/${deploymentId}/close`,
+        );
+        return res.data as ResponderDeploymentItem;
+    },
+
+    setActiveSite: async (
+        responderId: string,
+        locationId: number | null,
+    ): Promise<ResponderActiveSiteResponse> => {
+        const res = await apiClient.put(
+            `/responders/${responderId}/active-site`,
+            { location_id: locationId },
+        );
+        return res.data as ResponderActiveSiteResponse;
     },
 
     downloadTemplate: async (): Promise<void> => {
