@@ -12,6 +12,7 @@ import {
     BellRing,
     ScanEye,
     Siren,
+    MapPinned,
 } from "lucide-react";
 import type { LucideProps } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
@@ -75,6 +76,11 @@ const tabs = [
         name: "Admins",
         path: "/admins",
         icon: UserStar,
+    },
+    {
+        name: "Sites",
+        path: "/sites",
+        icon: MapPinned,
     },
     {
         name: "Settings",
