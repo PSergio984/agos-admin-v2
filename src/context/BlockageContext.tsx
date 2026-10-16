@@ -8,6 +8,7 @@ import {
 
 import type { Status, ObstructionConfidence } from "../types/blockage";
 import { useWebSocketMessage } from "./WebSocketContext";
+import { useCoreHook } from "./CoreContext";
 import { capitalizeFirstLetter } from "../lib/utils/formatter";
 import type { BlockageSummaryResponse } from "../types/blockage";
 
@@ -31,6 +32,22 @@ export function BlockageProvider({ children }: { children: ReactNode }) {
     const [isFetching, setIsFetching] = useState(true);
     const [warning, setWarning] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    const { locationDetails } = useCoreHook();
+
+    // Blockage status is site-scoped — when the scope changes, reset
+    // during render so the previous site's data is never painted.
+    const [seenLocationId, setSeenLocationId] = useState(
+        locationDetails.location_id,
+    );
+    if (seenLocationId !== locationDetails.location_id) {
+        setSeenLocationId(locationDetails.location_id);
+        setStatus(null);
+        setConfidence(null);
+        setIsFetching(true);
+        setWarning(null);
+        setError(null);
+    }
 
     useWebSocketMessage(
         "blockage_detection_update",

@@ -47,17 +47,39 @@ export function WaterLevelProvider({
     const [error, setError] = useState<string | null>(null);
 
     const coreContext = locationIdProp ? null : useCoreHook();
+    const sensorDeviceId = coreContext?.sensorDeviceDetails.sensor_device_id ?? 0;
+    // Key the reset on the SITE, not the device id — device details resolve
+    // asynchronously (0 → real id) after a site switch, and a device-keyed
+    // reset would wipe the WS payload that already arrived for the new site.
+    const scopeKey =
+        locationIdProp ?? coreContext?.locationDetails.location_id ?? 0;
 
-    // Fetch config data on mount
+    // Sensor data and config are site-scoped — when the scope changes,
+    // reset during render so the previous site's data is never painted.
+    const [seenScopeKey, setSeenScopeKey] = useState(scopeKey);
+    if (seenScopeKey !== scopeKey) {
+        setSeenScopeKey(scopeKey);
+        setSensorData(null);
+        setSensorConfig(null);
+        setWarning(null);
+        setError(null);
+        setIsFetching(true);
+        setIsFetchingConfig(true);
+    }
+
+    // Fetch config data on mount and whenever the scoped device changes.
     useEffect(() => {
+        if (!locationIdProp && !sensorDeviceId) {
+            setIsFetchingConfig(false);
+            return;
+        }
+
         const fetchSensorConfig = async () => {
             try {
                 setIsFetchingConfig(true);
                 const config = locationIdProp
                     ? await sensorAPI.getSensorConfigByLocation(locationIdProp)
-                    : await sensorAPI.getSensorConfig(
-                          coreContext!.sensorDeviceDetails.sensor_device_id,
-                      );
+                    : await sensorAPI.getSensorConfig(sensorDeviceId);
                 setSensorConfig(config);
             } catch (error) {
                 console.log(error);
@@ -67,7 +89,7 @@ export function WaterLevelProvider({
             }
         };
         fetchSensorConfig();
-    }, []);
+    }, [locationIdProp, sensorDeviceId]);
 
     // WebSocket message handler for sensor updates
     useWebSocketMessage(

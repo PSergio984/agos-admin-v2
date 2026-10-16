@@ -62,14 +62,20 @@ export function SensorConfigurationProvider({
 
     const { sensorDeviceDetails } = useCoreHook();
     const { toastSuccess, toastError } = useToast();
+    const deviceId = sensorDeviceDetails.sensor_device_id;
 
     useEffect(() => {
+        if (!deviceId) {
+            setOriginalConfig(null);
+            setNewConfig(null);
+            setIsEditing(false);
+            setIsFetching(false);
+            return;
+        }
         const fetchSensorConfig = async () => {
             try {
                 setIsFetching(true);
-                const res = await sensorAPI.getSensorConfig(
-                    sensorDeviceDetails.sensor_device_id,
-                );
+                const res = await sensorAPI.getSensorConfig(deviceId);
                 setOriginalConfig(res);
             } catch (error) {
             } finally {
@@ -77,7 +83,7 @@ export function SensorConfigurationProvider({
             }
         };
         fetchSensorConfig();
-    }, []);
+    }, [deviceId]);
 
     // When entering edit mode, initialize newConfig with originalConfig
     useEffect(() => {
@@ -99,7 +105,7 @@ export function SensorConfigurationProvider({
         try {
             setIsSaving(true);
             const updated = await sensorAPI.updateSensorConfig(
-                sensorDeviceDetails.sensor_device_id,
+                deviceId,
                 newConfig,
             );
             setOriginalConfig(updated);

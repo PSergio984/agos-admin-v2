@@ -4,9 +4,13 @@ import BlockageStatusCard from "./components/BlockageStatusCard";
 import WeatherConditionCard from "./components/WeatherConditionCard";
 import WaterLevelStatusCard from "./components/WaterLevelStatusCard";
 import FusionAnalysis from "./components/FusionAnalysis";
+import AllSitesWall from "./components/AllSitesWall";
+import { useCoreHook } from "../../context/CoreContext";
 import { useEffect } from "react";
 
 export default function Dashboard() {
+    const { isAllSites } = useCoreHook();
+
     useEffect(() => {
         document.title = "Dashboard - AGOS";
 
@@ -14,6 +18,10 @@ export default function Dashboard() {
             document.title = "AGOS";
         };
     }, []);
+
+    if (isAllSites) {
+        return <AllSitesWall />;
+    }
 
     return (
         <div className="flex flex-col gap-2">

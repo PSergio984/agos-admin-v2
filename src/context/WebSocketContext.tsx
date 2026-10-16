@@ -43,13 +43,19 @@ export function WebSocketProvider({
     const retryCountRef = useRef(0);
     const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    // Latest location id, so a stable `connect` (and any pending reconnect)
+    // always dials the current scope instead of a stale closure.
+    const locationIdRef = useRef(locationId);
+    locationIdRef.current = locationId;
+
     // Storage box that keeps track of event listeners for different message types
     const listenersRef = useRef<Map<string, Set<(data: unknown) => void>>>(
         new Map(),
     );
 
     const connect = useCallback(() => {
-        if (!locationId || !mountedRef.current) return;
+        const currentLocationId = locationIdRef.current;
+        if (!currentLocationId || !mountedRef.current) return;
 
         if (socketRef.current) {
             const oldSocket = socketRef.current;
@@ -61,7 +67,7 @@ export function WebSocketProvider({
         }
 
         const ws = new WebSocket(
-            `${websocketUrl}/ws?location_id=${locationId}`,
+            `${websocketUrl}/ws?location_id=${currentLocationId}`,
         );
         socketRef.current = ws;
 
@@ -108,8 +114,11 @@ export function WebSocketProvider({
         ws.onerror = (error) => {
             if (import.meta.env.DEV) console.error("WebSocket error:", error);
         };
-    }, [locationId]);
+    }, []);
 
+    // Re-run whenever the scoped location changes: the cleanup drops the old
+    // socket, then connect() dials the new location. A falsy locationId
+    // ("All sites" scope) simply stays disconnected.
     useEffect(() => {
         mountedRef.current = true;
         intentionalCloseRef.current = false;
@@ -121,9 +130,16 @@ export function WebSocketProvider({
             if (retryTimeoutRef.current) {
                 clearTimeout(retryTimeoutRef.current);
             }
-            socketRef.current?.close();
+            const ws = socketRef.current;
+            socketRef.current = null;
+            if (ws) {
+                ws.onclose = null;
+                ws.close();
+                setIsConnected(false);
+                setDisconnectedSince(new Date());
+            }
         };
-    }, [connect]);
+    }, [connect, locationId]);
 
     // Function to subscribe to messages of a specific type
     // useCallback memoizes a function definition between component re-renders

@@ -1,6 +1,8 @@
 import { AlertTriangle, Bell, Gauge } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCalibrationCard } from "./CalibrationCardContext";
+import { useCoreHook } from "../../../../context/CoreContext";
+import EmptyList from "../../../../components/common/EmptyList";
 
 import Container from "../../../../components/ui/Container";
 
@@ -180,8 +182,15 @@ const CriticalThresholdCard = () => {
 };
 
 export default function SensorConfiguration() {
-    const { isFetching, isSaving, isEditing, setIsEditing, handleSaveChanges } =
-        useCalibrationCard();
+    const {
+        isFetching,
+        isSaving,
+        isEditing,
+        setIsEditing,
+        handleSaveChanges,
+        originalConfig,
+    } = useCalibrationCard();
+    const { isAllSites } = useCoreHook();
 
     if (isFetching) {
         return (
@@ -194,6 +203,21 @@ export default function SensorConfiguration() {
                 <div className="flex justify-end">
                     <div className="skeleton rounded-md w-40 h-12 mt-3"></div>
                 </div>
+            </Container>
+        );
+    }
+
+    if (!originalConfig) {
+        return (
+            <Container headerTitle="SENSOR CONFIGURATION">
+                <EmptyList
+                    icon={Gauge}
+                    title={
+                        isAllSites
+                            ? "Select a site to configure its sensor."
+                            : "No sensor configured for this site."
+                    }
+                />
             </Container>
         );
     }

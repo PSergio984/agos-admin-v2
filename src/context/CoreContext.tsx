@@ -1,21 +1,47 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import ExcelJS from "exceljs";
 import { useToast } from "./ToastContext";
 import { downloadExcelFile, exportToExcel } from "../lib/utils/export";
 import { coreAPI } from "../lib/api/core";
+import { locationsAPI } from "../lib/api/locations";
 import type { SensorReadingForExportResponse } from "../types/sensor";
 import type {
     LocationDetails,
     SensorDeviceDetails,
     CameraDeviceDetails,
 } from "../types/core";
+import type { LocationItem } from "../types/location";
 import { sensorAPI } from "../lib/api/sensor";
+
+export type ViewScope = "all" | number;
 
 const STORAGE_KEYS = {
     LOCATION: "core_location",
     SENSOR_DEVICE: "core_sensor_device",
     CAMERA_DEVICE: "core_camera_device",
+    VIEW_SCOPE: "core_view_scope",
 } as const;
+
+const ALL_SITES_LOCATION: LocationDetails = {
+    location_id: 0,
+    location_name: "All sites",
+};
+const NO_SENSOR_DEVICE: SensorDeviceDetails = {
+    sensor_device_id: 0,
+    sensor_device_name: "",
+};
+const NO_CAMERA_DEVICE: CameraDeviceDetails = {
+    camera_device_id: 0,
+    camera_device_name: "",
+};
 
 const getObjectFromStorage = <T,>(key: string): T | null => {
     const stored = localStorage.getItem(key);
@@ -23,6 +49,16 @@ const getObjectFromStorage = <T,>(key: string): T | null => {
 };
 const setObjectToStorage = (key: string, value: object): void =>
     localStorage.setItem(key, JSON.stringify(value));
+
+const getViewScopeFromStorage = (): ViewScope | null => {
+    const stored = localStorage.getItem(STORAGE_KEYS.VIEW_SCOPE);
+    if (stored === null) return null;
+    const parsed: unknown = JSON.parse(stored);
+    if (parsed === "all") return "all";
+    return typeof parsed === "number" ? parsed : null;
+};
+const setViewScopeToStorage = (scope: ViewScope): void =>
+    localStorage.setItem(STORAGE_KEYS.VIEW_SCOPE, JSON.stringify(scope));
 
 const sensor_readings_export_columns = [
     {
@@ -53,6 +89,15 @@ interface CoreContextValue {
     locationDetails: LocationDetails;
     sensorDeviceDetails: SensorDeviceDetails;
     cameraDeviceDetails: CameraDeviceDetails;
+    sites: LocationItem[];
+    /** `null` only until the sites list resolves the initial scope. */
+    viewScope: ViewScope | null;
+    setViewScope: (scope: ViewScope) => void;
+    isAllSites: boolean;
+    // Re-fetch the sites registry (e.g. after creating/editing a site on the
+    // Sites page) and re-resolve the scope — a deactivated current site falls
+    // back to the first active one.
+    refreshSites: () => Promise<void>;
     isExportingToExcel: boolean;
     exportSensorReadingsToExcel: (
         startDate: string,
@@ -64,32 +109,28 @@ const CoreContext = createContext<CoreContextValue | undefined>(undefined);
 
 export function CoreProvider({ children }: { children: React.ReactNode }) {
     const [coreError, setCoreError] = useState<string | null>(null);
-    const [locationDetails, setLocationDetails] = useState<LocationDetails>(
-        () =>
-            getObjectFromStorage<LocationDetails>(STORAGE_KEYS.LOCATION) ?? {
-                location_id: 0,
-                location_name: "",
-            },
+    const [sites, setSites] = useState<LocationItem[]>([]);
+    const [viewScope, setViewScopeState] = useState<ViewScope | null>(
+        () => getViewScopeFromStorage(),
+    );
+    const [cachedLocation] = useState<LocationDetails | null>(() =>
+        getObjectFromStorage<LocationDetails>(STORAGE_KEYS.LOCATION),
     );
     const [sensorDeviceDetails, setSensorDeviceDetails] =
-        useState<SensorDeviceDetails>(
-            () =>
-                getObjectFromStorage<SensorDeviceDetails>(
-                    STORAGE_KEYS.SENSOR_DEVICE,
-                ) ?? {
-                    sensor_device_id: 0,
-                    sensor_device_name: "",
-                },
+        useState<SensorDeviceDetails>(() =>
+            getViewScopeFromStorage() === "all"
+                ? NO_SENSOR_DEVICE
+                : (getObjectFromStorage<SensorDeviceDetails>(
+                      STORAGE_KEYS.SENSOR_DEVICE,
+                  ) ?? NO_SENSOR_DEVICE),
         );
     const [cameraDeviceDetails, setCameraDeviceDetails] =
-        useState<CameraDeviceDetails>(
-            () =>
-                getObjectFromStorage<CameraDeviceDetails>(
-                    STORAGE_KEYS.CAMERA_DEVICE,
-                ) ?? {
-                    camera_device_id: 0,
-                    camera_device_name: "",
-                },
+        useState<CameraDeviceDetails>(() =>
+            getViewScopeFromStorage() === "all"
+                ? NO_CAMERA_DEVICE
+                : (getObjectFromStorage<CameraDeviceDetails>(
+                      STORAGE_KEYS.CAMERA_DEVICE,
+                  ) ?? NO_CAMERA_DEVICE),
         );
 
     const [exportingToExcelInProgress, setExportingToExcelInProgress] =
@@ -100,38 +141,115 @@ export function CoreProvider({ children }: { children: React.ReactNode }) {
 
     const { toastError } = useToast();
 
-    // Fetch from API only if localStorage is empty
-    useEffect(() => {
-        const fetchIfNeeded = async () => {
-            try {
-                if (!getObjectFromStorage(STORAGE_KEYS.LOCATION)) {
-                    const res = await coreAPI.getLocationDetails();
-                    setObjectToStorage(STORAGE_KEYS.LOCATION, res);
-                    setLocationDetails(res);
+    // Fetch the sites registry, then resolve the scope: a stored/current
+    // scope that still exists wins, otherwise the first active site (same
+    // landing spot as the old single-site behavior). `fatal` gates the
+    // full-screen error — only the initial load should blank the app.
+    const refreshSites = useCallback(async (fatal = false) => {
+        try {
+            const res = await locationsAPI.listSites();
+            setSites(res);
+            setViewScopeState((prev) => {
+                if (
+                    prev !== null &&
+                    (prev === "all" || res.some((s) => s.id === prev))
+                ) {
+                    return prev;
                 }
+                return res.find((s) => s.is_active)?.id ?? "all";
+            });
+        } catch {
+            if (fatal) {
+                setCoreError(
+                    "Failed to load system configuration. Please refresh the page.",
+                );
+            }
+        }
+    }, []);
 
-                if (!getObjectFromStorage(STORAGE_KEYS.SENSOR_DEVICE)) {
-                    const res = await coreAPI.getDeviceDetails();
-                    const sensor: SensorDeviceDetails = {
-                        sensor_device_id: res.sensor_device_id,
-                        sensor_device_name: res.sensor_device_name,
-                    };
-                    const camera: CameraDeviceDetails = {
-                        camera_device_id: res.camera_device_id,
-                        camera_device_name: res.camera_device_name,
-                    };
-                    setObjectToStorage(STORAGE_KEYS.SENSOR_DEVICE, sensor);
-                    setObjectToStorage(STORAGE_KEYS.CAMERA_DEVICE, camera);
-                    setSensorDeviceDetails(sensor);
-                    setCameraDeviceDetails(camera);
-                }
-            } catch (error) {
-                setCoreError("Failed to load system configuration. Please refresh the page.");
+    useEffect(() => {
+        void refreshSites(true);
+    }, [refreshSites]);
+
+    const setViewScope = useCallback((scope: ViewScope) => {
+        setViewScopeState(scope);
+    }, []);
+
+    // Persist the resolved scope so reloads land on the same view.
+    useEffect(() => {
+        if (viewScope !== null) {
+            setViewScopeToStorage(viewScope);
+        }
+    }, [viewScope]);
+
+    // The site under scope, or the "all sites" sentinel. While the initial
+    // scope is still resolving, fall back to the last cached location so
+    // returning users keep their previous view instead of a flash.
+    const locationDetails = useMemo<LocationDetails>(() => {
+        if (viewScope === "all") return ALL_SITES_LOCATION;
+        if (typeof viewScope === "number") {
+            const site = sites.find((s) => s.id === viewScope);
+            if (site) {
+                return { location_id: site.id, location_name: site.name };
+            }
+        }
+        return cachedLocation ?? { location_id: 0, location_name: "" };
+    }, [viewScope, sites, cachedLocation]);
+
+    useEffect(() => {
+        setObjectToStorage(STORAGE_KEYS.LOCATION, locationDetails);
+    }, [locationDetails]);
+
+    // Device details follow the selected site. A site with no provisioned
+    // devices (404 from /core/device-details) falls back to the zero-id
+    // sentinels so consumers stop firing requests.
+    const keepCachedDevicesRef = useRef(true);
+    useEffect(() => {
+        if (viewScope === null) return;
+        if (viewScope === "all") {
+            setSensorDeviceDetails(NO_SENSOR_DEVICE);
+            setCameraDeviceDetails(NO_CAMERA_DEVICE);
+            return;
+        }
+
+        // On site switches, clear the previous site's ids before refetching
+        // so consumers never render site-A values under site B. The first
+        // resolution keeps the cached ids instead (no reload flash).
+        const keepCached = keepCachedDevicesRef.current;
+        keepCachedDevicesRef.current = false;
+        if (!keepCached) {
+            setSensorDeviceDetails(NO_SENSOR_DEVICE);
+            setCameraDeviceDetails(NO_CAMERA_DEVICE);
+        }
+
+        let cancelled = false;
+        const fetchDeviceDetails = async () => {
+            try {
+                const res = await coreAPI.getDeviceDetails(viewScope);
+                if (cancelled) return;
+                const sensor: SensorDeviceDetails = {
+                    sensor_device_id: res.sensor_device_id,
+                    sensor_device_name: res.sensor_device_name,
+                };
+                const camera: CameraDeviceDetails = {
+                    camera_device_id: res.camera_device_id,
+                    camera_device_name: res.camera_device_name,
+                };
+                setSensorDeviceDetails(sensor);
+                setCameraDeviceDetails(camera);
+                setObjectToStorage(STORAGE_KEYS.SENSOR_DEVICE, sensor);
+                setObjectToStorage(STORAGE_KEYS.CAMERA_DEVICE, camera);
+            } catch {
+                if (cancelled) return;
+                setSensorDeviceDetails(NO_SENSOR_DEVICE);
+                setCameraDeviceDetails(NO_CAMERA_DEVICE);
             }
         };
-
-        fetchIfNeeded();
-    }, []);
+        void fetchDeviceDetails();
+        return () => {
+            cancelled = true;
+        };
+    }, [viewScope]);
 
     const exportSensorReadingsToExcel = async (
         startDateTime: string,
@@ -166,7 +284,7 @@ export function CoreProvider({ children }: { children: React.ReactNode }) {
                 workBook,
                 `${sensorDeviceDetails.sensor_device_name}_Readings_${startDateTime}_to_${endDateTime}.xlsx`,
             );
-        } catch (error) {
+        } catch {
             toastError("Failed to export sensor readings");
         } finally {
             setExportingToExcelInProgress({ mainMessage: "", subMessage: "" });
@@ -178,6 +296,11 @@ export function CoreProvider({ children }: { children: React.ReactNode }) {
             locationDetails,
             sensorDeviceDetails,
             cameraDeviceDetails,
+            sites,
+            viewScope,
+            setViewScope,
+            isAllSites: viewScope === "all",
+            refreshSites,
             isExportingToExcel: exportingToExcelInProgress.mainMessage !== "",
             exportSensorReadingsToExcel,
         }),
@@ -185,6 +308,10 @@ export function CoreProvider({ children }: { children: React.ReactNode }) {
             locationDetails,
             sensorDeviceDetails,
             cameraDeviceDetails,
+            sites,
+            viewScope,
+            setViewScope,
+            refreshSites,
             exportingToExcelInProgress,
         ],
     );

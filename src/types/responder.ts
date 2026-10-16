@@ -2,12 +2,16 @@ export interface ResponderCreateRequest {
     first_name: string;
     last_name: string;
     phone_number: string;
+    // Home site — required by the multi-site backend.
+    location_id: number;
 }
 
 export interface ResponderUpdateRequest {
     first_name?: string;
     last_name?: string;
     phone_number?: string;
+    // Home-site reassignment — must be an existing active site.
+    location_id?: number;
 }
 
 export interface ResponderListItem {
@@ -16,7 +20,37 @@ export interface ResponderListItem {
     last_name: string;
     phone_number: string;
     status: string;
+    // Home site.
+    location_id: number;
     has_push_subscription: boolean;
+}
+
+export interface ResponderDeploymentItem {
+    id: number;
+    location_id: number;
+    location_name: string;
+    starts_at: string;
+    ends_at: string | null;
+    planned_ends_at: string | null;
+    created_by: string;
+}
+
+export interface ResponderDeploymentsResponse {
+    home_location_id: number;
+    home_location_name: string;
+    active_location_id: number | null;
+    deployments: ResponderDeploymentItem[];
+}
+
+export interface ResponderDeploymentCreateRequest {
+    location_id: number;
+    starts_at?: string;
+    planned_ends_at?: string;
+}
+
+export interface ResponderActiveSiteResponse {
+    location_id: number;
+    active_location_id: number | null;
 }
 
 export interface ResponderAdditionalDetails {

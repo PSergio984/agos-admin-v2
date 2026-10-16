@@ -21,6 +21,7 @@ import { VideoProvider } from "./context/VideoContext";
 import { WebSocketProvider } from "./context/WebSocketContext";
 import { EvacuationProvider } from "./context/EvacuationContext";
 import { AdminsPageProvider } from "./pages/Admins/context/AdminsPageContext";
+import { SitesPageProvider } from "./pages/Sites/context/SitesPageContext";
 import { CoreProvider } from "./context/CoreContext";
 import Weather from "./pages/Weather/Weather";
 import ReadingLogs from "./pages/ReadingLogs";
@@ -29,6 +30,7 @@ import DetectionLogs from "./pages/DetectionLogs";
 import Evacuation from "./pages/Evacuation";
 import EvacuationCenters from "./pages/EvacuationCenters";
 import EvacuationControl from "./pages/EvacuationControl";
+import Sites from "./pages/Sites";
 
 export const router = createBrowserRouter([
   {
@@ -146,6 +148,16 @@ export const router = createBrowserRouter([
             <AdminsPageProvider>
               <Admins />
             </AdminsPageProvider>
+          </ErrorBoundary>
+        ),
+      },
+      {
+        path: "sites",
+        element: (
+          <ErrorBoundary>
+            <SitesPageProvider>
+              <Sites />
+            </SitesPageProvider>
           </ErrorBoundary>
         ),
       },

@@ -61,6 +61,17 @@ export default function SensorReadings() {
     const prevDeviceIdRef = useRef(deviceId);
 
     useEffect(() => {
+        if (!deviceId) {
+            // No device under the current scope — show the empty state
+            // instead of firing a request with id 0.
+            prevDeviceIdRef.current = deviceId;
+            setSensorReadings([]);
+            setHasMore(false);
+            setIsFetching(false);
+            setIsFetchingMore(false);
+            return;
+        }
+
         const deviceChanged = prevDeviceIdRef.current !== deviceId;
 
         // When the selected device changes while paginated, reset to page 1.

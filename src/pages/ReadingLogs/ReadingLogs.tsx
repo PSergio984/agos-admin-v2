@@ -11,6 +11,8 @@ import {
 import Header from "./components/Header";
 import AnalyzePanel from "./components/Analyze/AnalyzePanel";
 import DayDetailPanel from "./components/DataTable/DayDetailPanel/DayDetailPanel";
+import SelectSitePrompt from "../../components/common/SelectSitePrompt";
+import { useCoreHook } from "../../context/CoreContext";
 
 function ReadingLogsContent() {
     const { analyzeDrawerIsOpen, selectedSummary, setSelectedSummary } = useReadingLogs();
@@ -36,12 +38,18 @@ function ReadingLogsContent() {
 }
 
 export default function ReadingLogs() {
+    const { isAllSites } = useCoreHook();
+
     useEffect(() => {
         document.title = "Daily Analysis - AGOS";
         return () => {
             document.title = "AGOS";
         };
     }, []);
+
+    if (isAllSites) {
+        return <SelectSitePrompt title="Select a site to view its reading logs." />;
+    }
 
     return (
         <ReadingLogsProvider>
