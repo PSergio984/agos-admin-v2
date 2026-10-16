@@ -9,6 +9,7 @@ import {
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
 import { useToast } from "../../../context/ToastContext";
+import { useCoreHook } from "../../../context/CoreContext";
 import {
     cameraDevicesAPI,
     sensorDevicesAPI,
@@ -95,6 +96,7 @@ const SitesPageContext = createContext<SitesPageContextValue | undefined>(
 
 export function SitesPageProvider({ children }: { children: ReactNode }) {
     const { toastSuccess, toastError } = useToast();
+    const { refreshSites } = useCoreHook();
 
     const [sites, setSites] = useState<LocationItem[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
@@ -177,25 +179,34 @@ export function SitesPageProvider({ children }: { children: ReactNode }) {
                     }));
                 } catch {
                     toastError("Failed to load site devices");
-                    setSiteDetails((prev) => ({
-                        ...prev,
-                        [siteId]: { sensors: [], cameras: [], isLoading: false },
-                    }));
+                    // Leave the site uncached — a cached empty entry would be
+                    // indistinguishable from "no devices" and skip the retry.
+                    setSiteDetails((prev) => {
+                        const next = { ...prev };
+                        delete next[siteId];
+                        return next;
+                    });
                 }
             })();
         },
         [siteDetails, toastError],
     );
 
-    const upsertSite = useCallback((saved: LocationItem) => {
-        setSites((prev) => {
-            const exists = prev.some((s) => s.id === saved.id);
-            const next = exists
-                ? prev.map((s) => (s.id === saved.id ? saved : s))
-                : [...prev, saved];
-            return next.sort((a, b) => a.name.localeCompare(b.name));
-        });
-    }, []);
+    const upsertSite = useCallback(
+        (saved: LocationItem) => {
+            setSites((prev) => {
+                const exists = prev.some((s) => s.id === saved.id);
+                const next = exists
+                    ? prev.map((s) => (s.id === saved.id ? saved : s))
+                    : [...prev, saved];
+                return next.sort((a, b) => a.name.localeCompare(b.name));
+            });
+            // Keep the header switcher's site list (and the current scope, if
+            // this site was just deactivated) in sync with the registry.
+            void refreshSites();
+        },
+        [refreshSites],
+    );
 
     const setSiteActive = useCallback(
         async (site: LocationItem, isActive: boolean): Promise<boolean> => {

@@ -48,7 +48,11 @@ export function WaterLevelProvider({
 
     const coreContext = locationIdProp ? null : useCoreHook();
     const sensorDeviceId = coreContext?.sensorDeviceDetails.sensor_device_id ?? 0;
-    const scopeKey = locationIdProp || sensorDeviceId;
+    // Key the reset on the SITE, not the device id — device details resolve
+    // asynchronously (0 → real id) after a site switch, and a device-keyed
+    // reset would wipe the WS payload that already arrived for the new site.
+    const scopeKey =
+        locationIdProp ?? coreContext?.locationDetails.location_id ?? 0;
 
     // Sensor data and config are site-scoped — when the scope changes,
     // reset during render so the previous site's data is never painted.

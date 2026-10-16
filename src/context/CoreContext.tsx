@@ -94,6 +94,10 @@ interface CoreContextValue {
     viewScope: ViewScope | null;
     setViewScope: (scope: ViewScope) => void;
     isAllSites: boolean;
+    // Re-fetch the sites registry (e.g. after creating/editing a site on the
+    // Sites page) and re-resolve the scope — a deactivated current site falls
+    // back to the first active one.
+    refreshSites: () => Promise<void>;
     isExportingToExcel: boolean;
     exportSensorReadingsToExcel: (
         startDate: string,
@@ -137,32 +141,35 @@ export function CoreProvider({ children }: { children: React.ReactNode }) {
 
     const { toastError } = useToast();
 
-    // Fetch the sites registry once, then resolve the initial scope:
-    // a stored scope that still exists wins, otherwise the first active
-    // site (same landing spot as the old single-site behavior).
-    useEffect(() => {
-        const fetchSites = async () => {
-            try {
-                const res = await locationsAPI.listSites();
-                setSites(res);
-                setViewScopeState((prev) => {
-                    if (
-                        prev !== null &&
-                        (prev === "all" || res.some((s) => s.id === prev))
-                    ) {
-                        return prev;
-                    }
-                    return res.find((s) => s.is_active)?.id ?? "all";
-                });
-            } catch {
+    // Fetch the sites registry, then resolve the scope: a stored/current
+    // scope that still exists wins, otherwise the first active site (same
+    // landing spot as the old single-site behavior). `fatal` gates the
+    // full-screen error — only the initial load should blank the app.
+    const refreshSites = useCallback(async (fatal = false) => {
+        try {
+            const res = await locationsAPI.listSites();
+            setSites(res);
+            setViewScopeState((prev) => {
+                if (
+                    prev !== null &&
+                    (prev === "all" || res.some((s) => s.id === prev))
+                ) {
+                    return prev;
+                }
+                return res.find((s) => s.is_active)?.id ?? "all";
+            });
+        } catch {
+            if (fatal) {
                 setCoreError(
                     "Failed to load system configuration. Please refresh the page.",
                 );
             }
-        };
-
-        fetchSites();
+        }
     }, []);
+
+    useEffect(() => {
+        void refreshSites(true);
+    }, [refreshSites]);
 
     const setViewScope = useCallback((scope: ViewScope) => {
         setViewScopeState(scope);
@@ -293,6 +300,7 @@ export function CoreProvider({ children }: { children: React.ReactNode }) {
             viewScope,
             setViewScope,
             isAllSites: viewScope === "all",
+            refreshSites,
             isExportingToExcel: exportingToExcelInProgress.mainMessage !== "",
             exportSensorReadingsToExcel,
         }),
@@ -303,6 +311,7 @@ export function CoreProvider({ children }: { children: React.ReactNode }) {
             sites,
             viewScope,
             setViewScope,
+            refreshSites,
             exportingToExcelInProgress,
         ],
     );
