@@ -47,17 +47,35 @@ export function WaterLevelProvider({
     const [error, setError] = useState<string | null>(null);
 
     const coreContext = locationIdProp ? null : useCoreHook();
+    const sensorDeviceId = coreContext?.sensorDeviceDetails.sensor_device_id ?? 0;
+    const scopeKey = locationIdProp || sensorDeviceId;
 
-    // Fetch config data on mount
+    // Sensor data and config are site-scoped — when the scope changes,
+    // reset during render so the previous site's data is never painted.
+    const [seenScopeKey, setSeenScopeKey] = useState(scopeKey);
+    if (seenScopeKey !== scopeKey) {
+        setSeenScopeKey(scopeKey);
+        setSensorData(null);
+        setSensorConfig(null);
+        setWarning(null);
+        setError(null);
+        setIsFetching(true);
+        setIsFetchingConfig(true);
+    }
+
+    // Fetch config data on mount and whenever the scoped device changes.
     useEffect(() => {
+        if (!locationIdProp && !sensorDeviceId) {
+            setIsFetchingConfig(false);
+            return;
+        }
+
         const fetchSensorConfig = async () => {
             try {
                 setIsFetchingConfig(true);
                 const config = locationIdProp
                     ? await sensorAPI.getSensorConfigByLocation(locationIdProp)
-                    : await sensorAPI.getSensorConfig(
-                          coreContext!.sensorDeviceDetails.sensor_device_id,
-                      );
+                    : await sensorAPI.getSensorConfig(sensorDeviceId);
                 setSensorConfig(config);
             } catch (error) {
                 console.log(error);
@@ -67,7 +85,7 @@ export function WaterLevelProvider({
             }
         };
         fetchSensorConfig();
-    }, []);
+    }, [locationIdProp, sensorDeviceId]);
 
     // WebSocket message handler for sensor updates
     useWebSocketMessage(

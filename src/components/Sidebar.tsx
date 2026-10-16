@@ -16,6 +16,7 @@ import {
 import type { LucideProps } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import { useEvacuation } from "../context/EvacuationContext";
+import SiteScopeSwitcher from "./SiteScopeSwitcher";
 
 interface Tab {
     name: string;
@@ -123,6 +124,11 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                             <PanelLeftClose className="w-5 h-5" />
                         )}
                     </button>
+                </div>
+
+                {/* Admin viewing scope: pick one site or all sites */}
+                <div className="w-full pb-3">
+                    <SiteScopeSwitcher isCollapsed={isCollapsed} />
                 </div>
 
                 {isCollapsed ? (

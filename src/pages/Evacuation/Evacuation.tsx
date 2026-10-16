@@ -2,6 +2,8 @@ import { MapPinned, Siren } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { useEvacuation } from "../../context/EvacuationContext";
+import { useCoreHook } from "../../context/CoreContext";
+import SelectSitePrompt from "../../components/common/SelectSitePrompt";
 
 const tabs = [
     {
@@ -18,6 +20,7 @@ const tabs = [
 
 export default function Evacuation() {
     const { recommendation } = useEvacuation();
+    const { isAllSites } = useCoreHook();
 
     return (
         <div className="space-y-5">
@@ -57,7 +60,11 @@ export default function Evacuation() {
                 })}
             </nav>
 
-            <Outlet />
+            {isAllSites ? (
+                <SelectSitePrompt title="Select a site to manage evacuation." />
+            ) : (
+                <Outlet />
+            )}
         </div>
     );
 }

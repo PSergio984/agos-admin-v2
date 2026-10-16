@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { exportToExcel, downloadExcelFile } from "../../lib/utils/export";
 import { useToast } from "../../context/ToastContext";
+import { useCoreHook } from "../../context/CoreContext";
+import SelectSitePrompt from "../../components/common/SelectSitePrompt";
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 350;
@@ -30,6 +32,7 @@ export default function NotificationLogs() {
     const [analytics, setAnalytics] = useState<NotificationAnalyticsResponse | null>(null);
     const [isExporting, setIsExporting] = useState(false);
     const { toastSuccess, toastError } = useToast();
+    const { isAllSites } = useCoreHook();
 
     useEffect(() => {
         document.title = "Notification Logs - AGOS";
@@ -46,6 +49,10 @@ export default function NotificationLogs() {
     }, [searchQuery]);
 
     useEffect(() => {
+        if (isAllSites) {
+            setIsFetching(false);
+            return;
+        }
         const controller = new AbortController();
 
         const fetchResponders = async () => {
@@ -82,9 +89,10 @@ export default function NotificationLogs() {
 
         void fetchResponders();
         return () => controller.abort();
-    }, [page, debouncedSearch, toastError]);
+    }, [page, debouncedSearch, toastError, isAllSites]);
 
     useEffect(() => {
+        if (isAllSites) return;
         const fetchAnalytics = async () => {
             try {
                 setAnalytics(await notificationLogAPI.getAnalytics());
@@ -94,7 +102,7 @@ export default function NotificationLogs() {
         };
 
         void fetchAnalytics();
-    }, []);
+    }, [isAllSites]);
 
     const handleExport = async () => {
         setIsExporting(true);
@@ -128,6 +136,10 @@ export default function NotificationLogs() {
     const firstResult = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
     const lastResult = Math.min(page * PAGE_SIZE, total);
     const isSearchPending = searchQuery.trim() !== debouncedSearch;
+
+    if (isAllSites) {
+        return <SelectSitePrompt title="Select a site to view its notification logs." />;
+    }
 
     return (
         <div className="flex flex-col flex-1 h-full overflow-hidden gap-2">

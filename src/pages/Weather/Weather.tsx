@@ -6,10 +6,11 @@ import MainDisplay from "./components/MainDisplay";
 import DetailsGrid from "./components/DetailsGrid";
 import StatusRow from "./components/StatusRow";
 import PageHeader from "../../components/common/PageHeader";
+import SelectSitePrompt from "../../components/common/SelectSitePrompt";
 import { useCoreHook } from "../../context/CoreContext";
 
 export default function Weather() {
-    const { locationDetails } = useCoreHook();
+    const { locationDetails, isAllSites } = useCoreHook();
     const [weatherData, setWeatherData] =
         useState<WeatherComprehensiveResponse | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -41,6 +42,10 @@ export default function Weather() {
         };
         fetchData();
     }, [locationDetails.location_id]);
+
+    if (isAllSites) {
+        return <SelectSitePrompt title="Select a site to view its weather." />;
+    }
 
     if (isLoading) {
         return <WeatherSkeleton />;

@@ -15,6 +15,7 @@ import type {
 
 import { settingsAPI } from "../lib/api/settings";
 import { useWebSocketMessage } from "./WebSocketContext";
+import { useCoreHook } from "./CoreContext";
 
 interface FusionAnalysisContextValue {
     fusionAnalysis: FusionAnalysisData | null;
@@ -37,6 +38,22 @@ export function FusionAnalysisProvider({ children }: { children: ReactNode }) {
     const [isFetching, setIsFetching] = useState<boolean>(true);
     const [warning, setWarning] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    const { locationDetails } = useCoreHook();
+
+    // Fusion analysis is site-scoped — when the scope changes, reset
+    // during render so the previous site's data is never painted.
+    // Alert thresholds are global.
+    const [seenLocationId, setSeenLocationId] = useState(
+        locationDetails.location_id,
+    );
+    if (seenLocationId !== locationDetails.location_id) {
+        setSeenLocationId(locationDetails.location_id);
+        setFusionAnalysis(null);
+        setIsFetching(true);
+        setWarning(null);
+        setError(null);
+    }
 
     useEffect(() => {
         const fetchAlertThresholds = async () => {

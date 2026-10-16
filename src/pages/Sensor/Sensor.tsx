@@ -1,9 +1,13 @@
 import SensorStatus from "./components/SensorStatus";
 import SensorReadings from "./components/SensorReadings";
+import SelectSitePrompt from "../../components/common/SelectSitePrompt";
+import { useCoreHook } from "../../context/CoreContext";
 import { useEffect } from "react";
 import WaterLevelTrendContainer from "./components/WaterLevelTrend";
 
 export default function Sensor() {
+    const { isAllSites } = useCoreHook();
+
     useEffect(() => {
         document.title = "Sensor - AGOS";
 
@@ -11,6 +15,10 @@ export default function Sensor() {
             document.title = "AGOS";
         };
     }, []);
+
+    if (isAllSites) {
+        return <SelectSitePrompt title="Select a site to view its sensor." />;
+    }
 
     return (
         <div className="flex flex-col gap-2 min-w-0">

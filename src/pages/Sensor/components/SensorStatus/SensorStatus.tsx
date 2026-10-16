@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Container from "../../../../components/ui/Container";
 import type { SensorDeviceStatus } from "../../../../types/sensor";
 import { useToast } from "../../../../context/ToastContext";
+import { useCoreHook } from "../../../../context/CoreContext";
 import { sensorAPI } from "../../../../lib/api/sensor";
 import ConnectionContainer from "./components/ConnectionContianer";
 import LastUpdatedContainer from "./components/LastUpdatedContainer";
@@ -27,12 +28,19 @@ export default function SensorStatus() {
     const [isFetching, setIsFetching] = useState<boolean>(true);
 
     const { toastError } = useToast();
+    const { sensorDeviceDetails } = useCoreHook();
+    const deviceId = sensorDeviceDetails.sensor_device_id;
 
     useEffect(() => {
+        if (!deviceId) {
+            setSensorStatus(null);
+            setIsFetching(false);
+            return;
+        }
         const fetchStatus = async () => {
             try {
                 setIsFetching(true);
-                const res = await sensorAPI.getSensorStatus(1);
+                const res = await sensorAPI.getSensorStatus(deviceId);
                 setSensorStatus(res);
             } catch (error) {
                 console.log(error);
@@ -43,7 +51,7 @@ export default function SensorStatus() {
         };
 
         fetchStatus();
-    }, []);
+    }, [deviceId]);
 
     if (isFetching) {
         return (

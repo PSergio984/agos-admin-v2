@@ -41,6 +41,18 @@ export function EvacuationProvider({ children }: { children: ReactNode }) {
         useState<PublicAlertPayload | null>(null);
     const [isDispatching, setIsDispatching] = useState(false);
 
+    // Recommendations and public alerts are site-scoped — when the scope
+    // changes, reset during render so the previous site's prompt is
+    // never painted.
+    const [seenLocationId, setSeenLocationId] = useState(
+        locationDetails.location_id,
+    );
+    if (seenLocationId !== locationDetails.location_id) {
+        setSeenLocationId(locationDetails.location_id);
+        setRecommendation(null);
+        setLastPublicAlert(null);
+    }
+
     useWebSocketMessage<EvacuationRecommendation>(
         "evacuation_recommendation",
         (data) => setRecommendation(data),

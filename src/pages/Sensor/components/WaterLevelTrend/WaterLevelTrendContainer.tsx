@@ -32,13 +32,20 @@ export default function WaterLevelTrendContainer() {
         useState<SensorReadingTrendResponse | null>(null);
     const [isFetching, setIsFetching] = useState<boolean>(false);
 
+    const deviceId = sensorDeviceDetails.sensor_device_id;
+
     useEffect(() => {
+        if (!deviceId) {
+            setTrendData(null);
+            setIsFetching(false);
+            return;
+        }
         const fetchTrendData = async () => {
             try {
                 setIsFetching(true);
                 const res = await sensorAPI.getSensorReadingTrendData(
                     chosenRange.duration,
-                    sensorDeviceDetails.sensor_device_id,
+                    deviceId,
                 );
                 setTrendData(res);
             } catch (error) {
@@ -47,7 +54,7 @@ export default function WaterLevelTrendContainer() {
             }
         };
         fetchTrendData();
-    }, [chosenRange]);
+    }, [chosenRange, deviceId]);
 
     if (isFetching) {
         return (

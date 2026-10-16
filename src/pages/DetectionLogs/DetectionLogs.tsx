@@ -3,6 +3,7 @@ import { modelReadingLogAPI } from "../../lib/api/modelReadingLog";
 import type { BlockageStatus, ModelReadingListItem } from "../../types/modelReadingLog";
 import ReadingListItem from "./components/ReadingListItem";
 import ReadingDetailModal from "./components/ReadingDetailModal";
+import SelectSitePrompt from "../../components/common/SelectSitePrompt";
 import { useCoreHook } from "../../context/CoreContext";
 
 const STATUS_FILTERS: { label: string; value: BlockageStatus | "all" }[] = [
@@ -13,7 +14,7 @@ const STATUS_FILTERS: { label: string; value: BlockageStatus | "all" }[] = [
 ];
 
 export default function DetectionLogs() {
-    const { cameraDeviceDetails } = useCoreHook();
+    const { cameraDeviceDetails, isAllSites } = useCoreHook();
     const [readings, setReadings] = useState<ModelReadingListItem[]>([]);
     const [isFetching, setIsFetching] = useState(true);
     const [selectedReading, setSelectedReading] = useState<ModelReadingListItem | null>(null);
@@ -30,8 +31,16 @@ export default function DetectionLogs() {
         };
     }, []);
 
+    const deviceId = cameraDeviceDetails.camera_device_id;
+
     useEffect(() => {
-        if (!cameraDeviceDetails) return;
+        if (!deviceId) {
+            setReadings([]);
+            setHasMore(false);
+            setIsFetching(false);
+            setSelectedReading(null);
+            return;
+        }
 
         const fetchReadings = async () => {
             setIsFetching(true);
@@ -40,7 +49,7 @@ export default function DetectionLogs() {
                 const res = await modelReadingLogAPI.getPaginated(
                     1,
                     10,
-                    cameraDeviceDetails.camera_device_id,
+                    deviceId,
                     statusFilter === "all" ? undefined : statusFilter,
                 );
                 setReadings(res.items);
@@ -53,10 +62,10 @@ export default function DetectionLogs() {
         };
 
         fetchReadings();
-    }, [cameraDeviceDetails, statusFilter]);
+    }, [deviceId, statusFilter]);
 
     const loadMore = async () => {
-        if (!cameraDeviceDetails || isLoadingMore) return;
+        if (!deviceId || isLoadingMore) return;
 
         const nextPage = page + 1;
         setIsLoadingMore(true);
@@ -64,7 +73,7 @@ export default function DetectionLogs() {
             const res = await modelReadingLogAPI.getPaginated(
                 nextPage,
                 10,
-                cameraDeviceDetails.camera_device_id,
+                deviceId,
                 statusFilter === "all" ? undefined : statusFilter,
             );
             setReadings((prev) => [...prev, ...res.items]);
@@ -93,6 +102,10 @@ export default function DetectionLogs() {
         observer.observe(sentinel);
         return () => observer.disconnect();
     }, [hasMore, isLoadingMore]);
+
+    if (isAllSites) {
+        return <SelectSitePrompt title="Select a site to view its detection logs." />;
+    }
 
     return (
         <div className="flex flex-1 h-full overflow-hidden">
