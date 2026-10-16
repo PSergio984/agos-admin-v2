@@ -16,6 +16,7 @@ export interface ResponderListItem {
     last_name: string;
     phone_number: string;
     status: string;
+    location_id: number;
     has_push_subscription: boolean;
 }
 
