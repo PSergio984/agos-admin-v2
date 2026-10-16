@@ -14,6 +14,7 @@ import { parseRowToResponder } from "./fileImportUtils";
 import ResponderEntryRow from "./ResponderEntryRow";
 import { useToast } from "../../../../../../context/ToastContext";
 import { useResponders } from "../../../../context/RespondersPageContext";
+import { useCoreHook } from "../../../../../../context/CoreContext";
 import { responderAPI } from "../../../../../../lib/api/responder";
 
 interface FastAPIValidationIssue {
@@ -25,6 +26,7 @@ const RESPONDER_FIELD_LABELS: Record<string, string> = {
     first_name: "First name",
     last_name: "Last name",
     phone_number: "Phone number",
+    location_id: "Home site",
 };
 
 const getSubmitErrorMessage = (error: unknown): string => {
@@ -77,11 +79,17 @@ export default function AddResponderForm() {
 
     const { toastSuccess, toastError } = useToast();
     const { setCache } = useResponders();
+    const { sites } = useCoreHook();
+
+    // Every responder in a batch shares one home site — per-responder
+    // reassignment lives in the details drawer's Site Membership section.
+    const [homeSiteId, setHomeSiteId] = useState<string>("");
 
     // Reset form when closed
     useEffect(() => {
         if (!addResponderFormOpen) {
             setResponders([createEmptyResponder()]);
+            setHomeSiteId("");
         }
     }, [addResponderFormOpen]);
 
@@ -129,12 +137,14 @@ export default function AddResponderForm() {
         }
     };
 
-    const isFormValid = responders.every(
-        (r) =>
-            r.firstName.trim() &&
-            r.lastName.trim() &&
-            isValidPHMobileNumber(r.normalizedPhoneNumber),
-    );
+    const isFormValid =
+        homeSiteId !== "" &&
+        responders.every(
+            (r) =>
+                r.firstName.trim() &&
+                r.lastName.trim() &&
+                isValidPHMobileNumber(r.normalizedPhoneNumber),
+        );
 
     const handleCancel = () => {
         setAddResponderFormOpen(false);
@@ -148,6 +158,7 @@ export default function AddResponderForm() {
                 first_name: r.firstName.trim(),
                 last_name: r.lastName.trim(),
                 phone_number: r.normalizedPhoneNumber,
+                location_id: Number(homeSiteId),
             }));
 
             const newResponders =
@@ -239,6 +250,30 @@ export default function AddResponderForm() {
                 addResponderFormOpen ? "flex-1 p-4" : "max-h-0 p-0 border-0"
             }`}
         >
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-200 dark:border-slate-700/50">
+                <label
+                    htmlFor="responder-home-site"
+                    className="text-sm font-medium text-gray-700 dark:text-slate-300 whitespace-nowrap"
+                >
+                    Home Site
+                </label>
+                <select
+                    id="responder-home-site"
+                    value={homeSiteId}
+                    onChange={(e) => setHomeSiteId(e.target.value)}
+                    className="flex-1 max-w-xs rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-gray-900 dark:text-slate-100"
+                >
+                    <option value="" disabled>
+                        Select a site
+                    </option>
+                    {sites.map((site) => (
+                        <option key={site.id} value={site.id}>
+                            {site.name}
+                        </option>
+                    ))}
+                </select>
+            </div>
+
             <div className="space-y-3 flex-1 overflow-y-auto pr-1">
                 {responders.map((responder, index) => (
                     <ResponderEntryRow
